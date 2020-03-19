@@ -20,8 +20,8 @@ const tf = require('@tensorflow/tfjs');
 const fs = require('fs');
 const jpeg = require('jpeg-js');
 
-const backendNodeGL = require('./../dist/index');
-
+require('./../dist/index');
+tf.setBackend('headless-nodegl');
 const gl = tf.backend().getGPGPUContext().gl;
 console.log(`  - gl.VERSION: ${gl.getParameter(gl.VERSION)}`);
 console.log(`  - gl.RENDERER: ${gl.getParameter(gl.RENDERER)}`);
@@ -68,9 +68,25 @@ async function run(path) {
   end = tf.util.now();
   console.log(`  - Mobilenet cold start: ${end - start}ms`);
 
-  const times = 100;
+  const times = 10;
   let totalMs = 0;
-  console.log(`  - Running inference (${times}x) ...`);
+
+  // Use cpu backend
+  await tf.setBackend('cpu');
+  console.log(`  - CPU-backend: Running inference (${times}x) ...`);
+  for (let i = 0; i < times; i++) {
+    start = tf.util.now();
+    await model.classify(input);
+    end = tf.util.now();
+
+    totalMs += end - start;
+  }
+  console.log(`  - CPU-backend: Mobilenet inference: (${times}x) : ${(totalMs / times)}ms`);
+
+  totalMs = 0;
+  // Switch to nodegl backend
+  await tf.setBackend('headless-nodegl');
+  console.log(`  - NodeGL-backend: Running inference (${times}x) ...`);
   for (let i = 0; i < times; i++) {
     start = tf.util.now();
     await model.classify(input);
@@ -79,7 +95,7 @@ async function run(path) {
     totalMs += end - start;
   }
 
-  console.log(`  - Mobilenet inference: (${times}x) : ${(totalMs / times)}ms`);
+  console.log(`  - NodeGL-backend: Mobilenet inference: (${times}x) : ${(totalMs / times)}ms`);
 }
 
 if (process.argv.length !== 3) {
